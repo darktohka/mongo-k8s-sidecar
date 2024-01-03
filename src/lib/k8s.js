@@ -1,6 +1,5 @@
 var Client = require('node-kubernetes-client');
 var config = require('./config');
-var util = require("util");
 
 fs = require('fs');
 

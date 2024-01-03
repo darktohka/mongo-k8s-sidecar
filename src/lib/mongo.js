@@ -5,7 +5,7 @@ var config = require('./config');
 
 var localhost = '127.0.0.1'; //Can access mongo as localhost from a sidecar
 
-var getDb = function(host, done) {
+var getDb = function (host, done) {
   //If they called without host like getDb(function(err, db) { ... });
   if (arguments.length === 1) {
     if (typeof arguments[0] === 'function') {
@@ -34,14 +34,14 @@ var getDb = function(host, done) {
       return done(err);
     }
 
-    if(config.username) {
-        mongoDb.authenticate(config.username, config.password, function(err, result) {
-            if (err) {
-              return done(err);
-            }
+    if (config.username) {
+      mongoDb.authenticate(config.username, config.password, function (err, result) {
+        if (err) {
+          return done(err);
+        }
 
-            return done(null, db);
-        });
+        return done(null, db);
+      });
     } else {
       return done(null, db);
     }
@@ -49,7 +49,7 @@ var getDb = function(host, done) {
   });
 };
 
-var replSetGetConfig = function(db, done) {
+var replSetGetConfig = function (db, done) {
   db.admin().command({ replSetGetConfig: 1 }, {}, function (err, results) {
     if (err) {
       return done(err);
@@ -59,7 +59,7 @@ var replSetGetConfig = function(db, done) {
   });
 };
 
-var replSetGetStatus = function(db, done) {
+var replSetGetStatus = function (db, done) {
   db.admin().command({ replSetGetStatus: {} }, {}, function (err, results) {
     if (err) {
       return done(err);
@@ -69,7 +69,7 @@ var replSetGetStatus = function(db, done) {
   });
 };
 
-var initReplSet = function(db, hostIpAndPort, done) {
+var initReplSet = function (db, hostIpAndPort, done) {
   console.log('initReplSet', hostIpAndPort);
 
   db.admin().command({ replSetInitiate: {} }, {}, function (err) {
@@ -78,7 +78,7 @@ var initReplSet = function(db, hostIpAndPort, done) {
     }
 
     //We need to hack in the fix where the host is set to the hostname which isn't reachable from other hosts
-    replSetGetConfig(db, function(err, rsConfig) {
+    replSetGetConfig(db, function (err, rsConfig) {
       if (err) {
         return done(err);
       }
@@ -86,9 +86,9 @@ var initReplSet = function(db, hostIpAndPort, done) {
       console.log('initial rsConfig is', rsConfig);
       rsConfig.configsvr = config.isConfigRS;
       rsConfig.members[0].host = hostIpAndPort;
-      async.retry({times: 20, interval: 500}, function(callback) {
+      async.retry({ times: 20, interval: 500 }, function (callback) {
         replSetReconfig(db, rsConfig, false, callback);
-      }, function(err, results) {
+      }, function (err, results) {
         if (err) {
           return done(err);
         }
@@ -99,7 +99,7 @@ var initReplSet = function(db, hostIpAndPort, done) {
   });
 };
 
-var replSetReconfig = function(db, rsConfig, force, done) {
+var replSetReconfig = function (db, rsConfig, force, done) {
   console.log('replSetReconfig', rsConfig);
 
   rsConfig.version++;
@@ -113,8 +113,8 @@ var replSetReconfig = function(db, rsConfig, force, done) {
   });
 };
 
-var addNewReplSetMembers = function(db, addrToAdd, addrToRemove, shouldForce, done) {
-  replSetGetConfig(db, function(err, rsConfig) {
+var addNewReplSetMembers = function (db, addrToAdd, addrToRemove, shouldForce, done) {
+  replSetGetConfig(db, function (err, rsConfig) {
     if (err) {
       return done(err);
     }
@@ -127,7 +127,7 @@ var addNewReplSetMembers = function(db, addrToAdd, addrToRemove, shouldForce, do
   });
 };
 
-var addNewMembers = function(rsConfig, addrsToAdd) {
+var addNewMembers = function (rsConfig, addrsToAdd) {
   if (!addrsToAdd || !addrsToAdd.length) return;
 
   var memberIds = [];
@@ -175,7 +175,7 @@ var addNewMembers = function(rsConfig, addrsToAdd) {
   }
 };
 
-var removeDeadMembers = function(rsConfig, addrsToRemove) {
+var removeDeadMembers = function (rsConfig, addrsToRemove) {
   if (!addrsToRemove || !addrsToRemove.length) return;
 
   for (var i in addrsToRemove) {
@@ -190,13 +190,13 @@ var removeDeadMembers = function(rsConfig, addrsToRemove) {
   }
 };
 
-var isInReplSet = function(ip, done) {
-  getDb(ip, function(err, db) {
+var isInReplSet = function (ip, done) {
+  getDb(ip, function (err, db) {
     if (err) {
       return done(err);
     }
 
-    replSetGetConfig(db, function(err, rsConfig) {
+    replSetGetConfig(db, function (err, rsConfig) {
       db.close();
       if (!err && rsConfig) {
         done(null, true);

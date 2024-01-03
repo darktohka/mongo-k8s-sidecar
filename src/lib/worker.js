@@ -13,7 +13,7 @@ var unhealthySeconds = config.unhealthySeconds;
 var hostIp = false;
 var hostIpAndPort = false;
 
-var init = function(done) {
+var init = function (done) {
   //Borrowed from here: http://stackoverflow.com/questions/3653065/get-local-ip-address-in-node-js
   var hostName = os.hostname();
   dns.lookup(hostName, function (err, addr) {
@@ -37,7 +37,7 @@ var workloop = function workloop() {
   async.series([
     k8s.getMongoPods,
     mongo.getDb
-  ], function(err, results) {
+  ], function (err, results) {
     var db = null;
     if (Array.isArray(results) && results.length === 2) {
       db = results[1];
@@ -64,15 +64,15 @@ var workloop = function workloop() {
     //Lets try and get the rs status for this mongo instance
     //If it works with no errors, they are in the rs
     //If we get a specific error, it means they aren't in the rs
-    mongo.replSetGetStatus(db, function(err, status) {
+    mongo.replSetGetStatus(db, function (err, status) {
       if (err) {
         if (err.code && err.code == 94) {
-          notInReplicaSet(db, pods, function(err) {
+          notInReplicaSet(db, pods, function (err) {
             finish(err, db);
           });
         }
         else if (err.code && err.code == 93) {
-          invalidReplicaSet(db, pods, status, function(err) {
+          invalidReplicaSet(db, pods, status, function (err) {
             finish(err, db);
           });
         }
@@ -82,14 +82,14 @@ var workloop = function workloop() {
         return;
       }
 
-      inReplicaSet(db, pods, status, function(err) {
+      inReplicaSet(db, pods, status, function (err) {
         finish(err, db);
       });
     });
   });
 };
 
-var finish = function(err, db) {
+var finish = function (err, db) {
   if (err) {
     console.error('Error in workloop', err);
   }
@@ -101,7 +101,7 @@ var finish = function(err, db) {
   setTimeout(workloop, loopSleepSeconds * 1000);
 };
 
-var inReplicaSet = function(db, pods, status, done) {
+var inReplicaSet = function (db, pods, status, done) {
   //If we're already in a rs and we ARE the primary, do the work of the primary instance (i.e. adding others)
   //If we're already in a rs and we ARE NOT the primary, just continue, nothing to do
   //If we're already in a rs and NO ONE is a primary, elect someone to do the work for a primary
@@ -129,7 +129,7 @@ var inReplicaSet = function(db, pods, status, done) {
   done();
 };
 
-var primaryWork = function(db, pods, members, shouldForce, done) {
+var primaryWork = function (db, pods, members, shouldForce, done) {
   //Loop over all the pods we have and see if any of them aren't in the current rs members array
   //If they aren't in there, add them
   var addrToAdd = addrToAddLoop(pods, members);
@@ -146,9 +146,9 @@ var primaryWork = function(db, pods, members, shouldForce, done) {
   done();
 };
 
-var notInReplicaSet = function(db, pods, done) {
-  var createTestRequest = function(pod) {
-    return function(completed) {
+var notInReplicaSet = function (db, pods, done) {
+  var createTestRequest = function (pod) {
+    return function (completed) {
       mongo.isInReplSet(pod.status.podIP, completed);
     };
   };
@@ -164,7 +164,7 @@ var notInReplicaSet = function(db, pods, done) {
     }
   }
 
-  async.parallel(testRequests, function(err, results) {
+  async.parallel(testRequests, function (err, results) {
     if (err) {
       return done(err);
     }
@@ -189,7 +189,7 @@ var notInReplicaSet = function(db, pods, done) {
   });
 };
 
-var invalidReplicaSet = function(db, pods, status, done) {
+var invalidReplicaSet = function (db, pods, status, done) {
   // The replica set config has become invalid, probably due to catastrophic errors like all nodes going down
   // this will force re-initialize the replica set on this node. There is a small chance for data loss here
   // because it is forcing a reconfigure, but chances are recovering from the invalid state is more important
@@ -208,15 +208,15 @@ var invalidReplicaSet = function(db, pods, status, done) {
   var addrToAdd = addrToAddLoop(pods, members);
   var addrToRemove = addrToRemoveLoop(members);
 
-  mongo.addNewReplSetMembers(db, addrToAdd, addrToRemove, true, function(err) {
+  mongo.addNewReplSetMembers(db, addrToAdd, addrToRemove, true, function (err) {
     done(err);
   });
 };
 
-var podElection = function(pods) {
+var podElection = function (pods) {
   //Because all the pods are going to be running this code independently, we need a way to consistently find the same
   //node to kick things off, the easiest way to do that is convert their ips into longs and find the highest
-  pods.sort(function(a,b) {
+  pods.sort(function (a, b) {
     var aIpVal = ip.toLong(a.status.podIP);
     var bIpVal = ip.toLong(b.status.podIP);
     if (aIpVal < bIpVal) return -1;
@@ -228,7 +228,7 @@ var podElection = function(pods) {
   return pods[0].status.podIP == hostIp;
 };
 
-var addrToAddLoop = function(pods, members) {
+var addrToAddLoop = function (pods, members) {
   var addrToAdd = [];
   for (var i in pods) {
     var pod = pods[i];
@@ -259,20 +259,20 @@ var addrToAddLoop = function(pods, members) {
   return addrToAdd;
 };
 
-var addrToRemoveLoop = function(members) {
-    var addrToRemove = [];
-    for (var i in members) {
-        var member = members[i];
-        if (memberShouldBeRemoved(member)) {
-            addrToRemove.push(member.name);
-        }
+var addrToRemoveLoop = function (members) {
+  var addrToRemove = [];
+  for (var i in members) {
+    var member = members[i];
+    if (memberShouldBeRemoved(member)) {
+      addrToRemove.push(member.name);
     }
-    return addrToRemove;
+  }
+  return addrToRemove;
 };
 
-var memberShouldBeRemoved = function(member) {
-    return !member.health
-        && moment().subtract(unhealthySeconds, 'seconds').isAfter(member.lastHeartbeatRecv);
+var memberShouldBeRemoved = function (member) {
+  return !member.health
+    && moment().subtract(unhealthySeconds, 'seconds').isAfter(member.lastHeartbeatRecv);
 };
 
 /**
@@ -280,7 +280,7 @@ var memberShouldBeRemoved = function(member) {
  * @returns string - podIp the pod's IP address with the port from config attached at the end. Example
  * WWW.XXX.YYY.ZZZ:27017. It returns undefined, if the data is insufficient to retrieve the IP address.
  */
-var getPodIpAddressAndPort = function(pod) {
+var getPodIpAddressAndPort = function (pod) {
   if (!pod || !pod.status || !pod.status.podIP) {
     return;
   }
@@ -296,7 +296,7 @@ var getPodIpAddressAndPort = function(pod) {
  * @param pod the Kubernetes pod, containing the information from the k8s client.
  * @returns string the k8s MongoDB stable network address, or undefined.
  */
-var getPodStableNetworkAddressAndPort = function(pod) {
+var getPodStableNetworkAddressAndPort = function (pod) {
   if (!config.k8sMongoServiceName || !pod || !pod.metadata || !pod.metadata.name || !pod.metadata.namespace) {
     return;
   }
